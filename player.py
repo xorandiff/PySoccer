@@ -1,11 +1,10 @@
 import pygame, pymunk
-from pymunk.vec2d import Vec2d
-
+import numpy as np
 class PlayerLogic:
     # Sprint boolean
     sprint = False
     
-    def __init__(self, position: tuple[float, float], radius: float, walkingSpeed: int, sprintFactor: float, sprintEnergy: float, sprintEnergyDrop: float):
+    def __init__(self, position: tuple[float, float], radius: float, walkingSpeed: float, sprintFactor: float, sprintEnergy: float, sprintEnergyDrop: float):
         self.radius = radius
         self.speed = walkingSpeed
         self.sprintFactor = float(sprintFactor)
@@ -16,7 +15,7 @@ class PlayerLogic:
         
         # Create a body for the player with position matching its sprite
         self.body = pymunk.Body()
-        self.body.position = position
+        self.body.position = tuple(position)
         
         # Custom velocity function to amend body damping to lower value, 
         # which results in sharper turns while walking
@@ -41,16 +40,12 @@ class PlayerLogic:
         self.body.angle = 0
 
     # Method used for moving the player
-    def walk(self, direction: tuple[float, float]):
-        v = Vec2d(*direction)
-        
+    def walk(self, direction: np.ndarray):        
         # Set player speed for walk/sprint
         speed = self.speed * self.sprintFactor if self.sprint and self.sprintEnergy > 0 else self.speed
-        
-        v = Vec2d.scale_to_length(v, speed) 
-        
+        print(tuple(direction * speed))
         # Apply impulse to move the player in desired direction
-        self.body.apply_impulse_at_local_point(v)
+        self.body.apply_impulse_at_local_point(direction * speed)
 
 
 class Player(pygame.sprite.Sprite):

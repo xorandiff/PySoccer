@@ -19,24 +19,25 @@ class Logic:
         self._sound = Sound()
         self._walkingDirections = [False, False, False, False]
         
-        self.playerPosition = array(self._size) / 2 - array([100, 0])
-        self.inputList = []
+        self.playerPosition = array(self._size) / 2 - UNIT_X * FIELD_CIRCLE_RADIUS
+        self.goalkeeperPosition = self._size[0] - GK_STARTPOS_GAP, self._size[1] / 2
+        self.events = []
         
         self.soccerField = SoccerFieldLogic(self._size, WALL_THICKNESS)
-        self.player = PlayerLogic(((self._size[0] - 100) / 2, self._size[1] / 2), PLAYER_RADIUS, PLAYER_WALKING_SPEED, PLAYER_SPRINT_FACTOR, PLAYER_SPRINT_MAX_ENERGY, PLAYER_SPRINT_ENERGY_DROP)
-        self.ball = BallLogic((self._size[0] / 2, self._size[1] / 2), BALL_RADIUS, COLLISION_TYPE_BALL)
+        self.player = PlayerLogic(self.playerPosition, PLAYER_RADIUS, PLAYER_WALKING_SPEED, PLAYER_SPRINT_FACTOR, PLAYER_SPRINT_MAX_ENERGY, PLAYER_SPRINT_ENERGY_DROP)
+        self.goalkeeper = PlayerLogic(self.goalkeeperPosition, PLAYER_RADIUS, PLAYER_WALKING_SPEED, PLAYER_SPRINT_FACTOR, PLAYER_SPRINT_MAX_ENERGY, PLAYER_SPRINT_ENERGY_DROP)
+        self.ball = BallLogic(array(self._size) / 2, BALL_RADIUS, COLLISION_TYPE_BALL)
         self.leftGoal = Goal(GOAL_SIZE, (GOAL_POST_BORDER_GAP + GOAL_WIDTH / 2, SCREEN_HEIGHT / 2), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (0, 0, GOAL_NET_NONCOLLISION_LAYERS, 0), (False, False, True, False), COLLISION_TYPE_GOAL_POST)
         self.rightGoal = Goal(GOAL_SIZE, (SCREEN_WIDTH - GOAL_POST_BORDER_GAP - GOAL_WIDTH / 2, SCREEN_HEIGHT / 2), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (GOAL_NET_NONCOLLISION_LAYERS, 0, 0, 0), (True, False, False, False), COLLISION_TYPE_GOAL_POST)
         self.goals = [ self.leftGoal, self.rightGoal ]
         self.goalSpaceObjects = self.leftGoal.spaceObjects + self.rightGoal.spaceObjects
-        
         
         self.space = pymunk.Space()
         self.space.damping = SPACE_DAMPING
         self.space.collision_slop = SPACE_COLLISION_SLOP
         
         # Add PyMunk shapes and bodies into space
-        self.space.add(self.player.body, self.player.shape, self.ball.body, self.ball.shape, *self.soccerField.walls, *self.goalSpaceObjects)
+        self.space.add(self.player.body, self.player.shape, self.goalkeeper.body, self.goalkeeper.shape, self.ball.body, self.ball.shape, *self.soccerField.walls, *self.goalSpaceObjects)
         
         self.lock = threading.Lock()
         
@@ -66,45 +67,74 @@ class Logic:
             self.ball.body.apply_impulse_at_local_point(kickForceVector)
             self.ball.body.angular_velocity += 10
             self._sound.kick()
+    
+    def goal_post_hit(self, arbiter, space, data):
+        if self.ball.body.velocity.length > 300:
+            self._sound.goalPostHit()
+        return True
+    
+    def goalkeeperAi(self, player: PlayerLogic, goal: Goal):
+        playerBallDistance = Vec2d.get_distance(player.body.position, self.ball.body.position)
+        playerGoalDistance = Vec2d.get_distance(player.body.position, goal.rect.center)
         
+        # Kick the ball away if it's close enough
+        self.ballKick(player)
+        
+        if playerGoalDistance < GK_MAX_GOAL_DISTANCE and playerBallDistance <= GK_MIN_APPROACH_DISTANCE + GK_MAX_GOAL_DISTANCE:
+            v = Vec2d(*self.ball.body.position) - Vec2d(*player.body.position)
+            
+            player.sprint = False
+            if playerBallDistance <= GK_MIN_APPROACH_DISTANCE + PLAYER_RADIUS + BALL_RADIUS:
+                player.sprint = True
+
+            player.walk(v.int_tuple)
+        else:
+            baseDistance = Vec2d.get_distance(player.body.position, Vec2d(*GK_RIGHT_STARTPOS))
+            if (baseDistance > 10):
+                v = Vec2d(*GK_RIGHT_STARTPOS) - Vec2d(*player.body.position)
+                player.walk(v.int_tuple)
+    
     def _loop(self):
         while True:
-            if len(self.inputList):
+            if len(self.events):
                 with self.lock:
-                    event = self.inputList.pop(0)
-                key = event.key 
+                    event = self.events.pop(0)
                 
-                if key in [pygame.K_LEFT, pygame.K_a]:
-                    self._walkingDirections[0] = event.type == pygame.KEYDOWN
-                if key in [pygame.K_RIGHT, pygame.K_d]:
-                    self._walkingDirections[1] = event.type == pygame.KEYDOWN
-                if key in [pygame.K_UP, pygame.K_w]:
-                    self._walkingDirections[2] = event.type == pygame.KEYDOWN
-                if key in [pygame.K_DOWN, pygame.K_s]:
-                    self._walkingDirections[3] = event.type == pygame.KEYDOWN
+                if event.type in [pygame.KEYDOWN, pygame.KEYUP]:
+                    key = event.key
                     
-                # Set player sprint movement if left shift is pressed
-                if key == pygame.K_LSHIFT:
-                    self.player.sprint = event.type == pygame.KEYDOWN
+                    if key in [pygame.K_LEFT, pygame.K_a]:
+                        self._walkingDirections[0] = event.type == pygame.KEYDOWN
+                    if key in [pygame.K_RIGHT, pygame.K_d]:
+                        self._walkingDirections[1] = event.type == pygame.KEYDOWN
+                    if key in [pygame.K_UP, pygame.K_w]:
+                        self._walkingDirections[2] = event.type == pygame.KEYDOWN
+                    if key in [pygame.K_DOWN, pygame.K_s]:
+                        self._walkingDirections[3] = event.type == pygame.KEYDOWN
+                        
+                    # Set player sprint movement if left shift is pressed
+                    if key == pygame.K_LSHIFT:
+                        self.player.sprint = event.type == pygame.KEYDOWN
                 
-                if event.type == pygame.KEYDOWN:
-                    if key == pygame.K_m:
-                        self._sound.toggleMute()
-                    
-                    # Kick the ball if SPACE is pressed
-                    if key == pygame.K_SPACE:
-                        self.ballKick(self.player)
+                    if event.type == pygame.KEYDOWN:
+                        if key == pygame.K_m:
+                            self._sound.toggleMute()
+                        
+                        # Kick the ball if SPACE is pressed
+                        if key == pygame.K_SPACE:
+                            self.ballKick(self.player)
             
             if self._walkingDirections[0]:
-                self.player.walk((-1, 0))
+                self.player.walk(-UNIT_X)
             if self._walkingDirections[1]:
-                self.player.walk((1, 0))
+                self.player.walk(UNIT_X)
             if self._walkingDirections[2]:
-                self.player.walk((0, -1))
+                self.player.walk(-UNIT_Y)
             if self._walkingDirections[3]:
-                self.player.walk((0, 1))
+                self.player.walk(UNIT_Y)
             
             self.player.update()
+            self.goalkeeperAi(self.goalkeeper, self.rightGoal)
             
             self.space.step(1 / self._fps)
             time.sleep(1 / self._fps)
@@ -114,7 +144,6 @@ class Logic:
 
 class Game:
     def __init__(self):
-        pygame.init()
         pygame.display.set_caption(WINDOW_TITLE)
         
         self.logic = Logic(SCREEN_SIZE, FPS)
@@ -130,18 +159,19 @@ class Game:
         self.menu = [self.vs_ai_button, self.vs_human_button]
 
         # Initialize game objects
-        self.soccer_field = SoccerField(GRASS_TILE_SIZE)
-        self.leftGoal = Goal(GOAL_SIZE, (GOAL_POST_BORDER_GAP + GOAL_WIDTH / 2, SCREEN_HEIGHT / 2), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (0, 0, GOAL_NET_NONCOLLISION_LAYERS, 0), (False, False, True, False), COLLISION_TYPE_GOAL_POST)
-        self.rightGoal = Goal(GOAL_SIZE, (SCREEN_WIDTH - GOAL_POST_BORDER_GAP - GOAL_WIDTH / 2, SCREEN_HEIGHT / 2), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (GOAL_NET_NONCOLLISION_LAYERS, 0, 0, 0), (True, False, False, False), COLLISION_TYPE_GOAL_POST)
+        self.soccer_field = SoccerField(GRASS_TILE_SIZE, FIELD_CIRCLE_RADIUS, FIELD_LINE_WIDTH)
+        self.leftGoal = Goal(GOAL_SIZE, self.area.midleft + UNIT_X * GOAL_CENTER_GAP, 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (0, 0, GOAL_NET_NONCOLLISION_LAYERS, 0), (False, False, True, False), COLLISION_TYPE_GOAL_POST)
+        self.rightGoal = Goal(GOAL_SIZE, self.area.midright - UNIT_X * GOAL_CENTER_GAP, 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (GOAL_NET_NONCOLLISION_LAYERS, 0, 0, 0), (True, False, False, False), COLLISION_TYPE_GOAL_POST)
         self.goals = [ self.leftGoal, self.rightGoal ]
         self.goalSprites = [ goal.sprites for goal in self.goals ]
+        
         self.players = [
-            Player((self.area.centerx - 100, self.area.centery), PLAYER_RADIUS),
-            #Player((self.rightGoal.topLeft[0] - 20, self.area.centery), PLAYER_RADIUS)
+            Player(self.area.center - UNIT_X * FIELD_CIRCLE_RADIUS, PLAYER_RADIUS),
+            Player(self.area.midright - UNIT_X * GK_STARTPOS_GAP, PLAYER_RADIUS)
         ]
-        self.player = self.players[0]
-        #self.goalkeeper = self.players[1]
         self.ball = Ball(self.area.center, BALL_RADIUS)
+        self.player = self.players[0]
+        self.goalkeeper = self.players[1]
 
         # Create sprite group containing all game sprites
         self.allSprites = pygame.sprite.RenderPlain((self.soccer_field, self.ball, *self.players, *self.goalSprites))
@@ -153,32 +183,6 @@ class Game:
     def showMenu(self):
         for item in self.menu:
             item.show()
-
-    """ def goal_post_hit(self, arbiter, space, data):
-        if self.ball.body.velocity.length > 300:
-            self.goal_post_hit_sound.play()
-        return True """
-
-    """ def goalkeeperAi(self, player: Player, goal: Goal):
-        playerBallDistance = Vec2d.get_distance(player.body.position, self.ball.body.position)
-        playerGoalDistance = Vec2d.get_distance(player.body.position, Vec2d(*goal.center))
-        
-        # Kick the ball away if it's close enough
-        self.ball_kick(player)
-        
-        if playerGoalDistance < GK_MAX_GOAL_DISTANCE and playerBallDistance <= GK_MIN_APPROACH_DISTANCE + GK_MAX_GOAL_DISTANCE:
-            v = Vec2d(*self.ball.body.position) - Vec2d(*player.body.position)
-            
-            player.sprint = False
-            if playerBallDistance <= GK_MIN_APPROACH_DISTANCE + PLAYER_RADIUS + BALL_RADIUS:
-                player.sprint = True
-
-            player.walk(v.int_tuple)
-        else:
-            baseDistance = Vec2d.get_distance(player.body.position, Vec2d(*GK_RIGHT_STARTPOS))
-            if (baseDistance > 10):
-                v = Vec2d(*GK_RIGHT_STARTPOS) - Vec2d(*player.body.position)
-                player.walk(v.int_tuple) """
     
     def start(self):
         #time.sleep(0.5)
@@ -186,12 +190,13 @@ class Game:
         # Game loop
         while self.running:            
             for event in pygame.event.get():
+                # Send information about event to pymunk thread
+                with self.logic.lock:
+                    self.logic.events.append(event)
+                
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
-                    # Send information about keydown event to pymunk thread
-                    with self.logic.lock:
-                        self.logic.inputList.append(event)
                     key = event.key
                     
                     # Toogle fullscreen is CTRL+F is pressed
@@ -200,7 +205,7 @@ class Game:
                 elif event.type == pygame.KEYUP:
                     # Send information about keydown event to pymunk thread
                     with self.logic.lock:
-                        self.logic.inputList.append(event)
+                        self.logic.events.append(event)
                 elif event.type == pygame_gui.UI_BUTTON_PRESSED:
                     if event.ui_element == self.vs_ai_button:
                         self.hideMenu()
@@ -210,20 +215,19 @@ class Game:
                 
                 self.manager.process_events(event)
             
-            #self.goalkeeperAi(self.goalkeeper, self.rightGoal)
-            
             time_delta = self.clock.tick(FPS) / 1000.0
             
             # Read sprite new positions computed by pymunk from physics thread
             with self.logic.lock:
                 self.player.centerPosition = self.logic.player.body.position
+                self.goalkeeper.centerPosition = self.logic.goalkeeper.body.position
                 
                 self.ball.centerPosition = self.logic.ball.body.position
-                self.ball.angle = -numpy.rad2deg(self.logic.ball.body.angle)
+                self.ball.angle = -numpy.degrees(self.logic.ball.body.angle)
                 
                 for sprite, body in zip(self.leftGoal.sprites + self.rightGoal.sprites, self.logic.leftGoal.bodies + self.logic.rightGoal.bodies):
                     sprite.positionCenter = body.position
-                    sprite.angle = -numpy.rad2deg(body.angle)
+                    sprite.angle = -numpy.degrees(body.angle)
                 
             self.allSprites.update()
             self.manager.update(time_delta)

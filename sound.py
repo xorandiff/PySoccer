@@ -13,3 +13,6 @@ class Sound:
     
     def kick(self):
         self._kick.play()
+        
+    def goalPostHit(self):
+        self._goalPostHit.play()

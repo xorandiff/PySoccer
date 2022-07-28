@@ -1,5 +1,7 @@
-import math, pymunk
+import math, pygame, pymunk
 from pymunk.constraints import DampedSpring
+import numpy as np
+
 from goal_post import GoalPost, GoalPostLogic
 from net_segment import NetSegment, NetSegmentLogic
 
@@ -22,24 +24,13 @@ class Goal:
         self.segmentLengthX = (self.width - self.stiffnessGap - 4 * self.postRadius) / self.segmentCountX
         self.segmentLengthY = (self.height - 2 * self.stiffnessGap - 4 * self.postRadius) / self.segmentCountY
         
-        self.topLeft = self.centerX - self.width / 2, self.centerY - self.height / 2
-        self.topRight = self.centerX + self.width / 2, self.centerY - self.height / 2
-        self.bottomLeft = self.centerX - self.width / 2, self.centerY + self.height / 2
-        self.bottomRight = self.centerX + self.width / 2, self.centerY + self.height / 2
+        self.rect = pygame.Rect(np.array(positionCenter) - np.array(self.size) / 2, self.size)
+        self.postsRect = self.rect.inflate(-self.postRadius, -self.postRadius)
+                
+        self.postPositions = [ self.postsRect.topleft, self.postsRect.topright, self.postsRect.bottomleft, self.postsRect.bottomright ]
         
-        self.postSprites = [
-            GoalPost((self.topLeft[0] + self.postRadius, self.topLeft[1] + self.postRadius), self.postRadius),
-            GoalPost((self.topRight[0] - self.postRadius, self.topRight[1] + self.postRadius), self.postRadius),
-            GoalPost((self.bottomLeft[0] + self.postRadius, self.bottomLeft[1] - self.postRadius), self.postRadius),
-            GoalPost((self.bottomRight[0] - self.postRadius, self.bottomRight[1] - self.postRadius), self.postRadius)
-        ]
-        
-        self.postLogics = [
-            GoalPostLogic((self.topLeft[0] + self.postRadius, self.topLeft[1] + self.postRadius), self.postRadius, postCollisionType),
-            GoalPostLogic((self.topRight[0] - self.postRadius, self.topRight[1] + self.postRadius), self.postRadius, postCollisionType),
-            GoalPostLogic((self.bottomLeft[0] + self.postRadius, self.bottomLeft[1] - self.postRadius), self.postRadius, postCollisionType),
-            GoalPostLogic((self.bottomRight[0] - self.postRadius, self.bottomRight[1] - self.postRadius), self.postRadius, postCollisionType)
-        ]
+        self.postSprites = [ GoalPost(postPosition, self.postRadius) for postPosition in self.postPositions ]
+        self.postLogics = [ GoalPostLogic(postPosition, self.postRadius, postCollisionType) for postPosition in self.postPositions ]
         
         self.netSegmentSprites = []
         self.netSegmentLogics = []
@@ -49,8 +40,8 @@ class Goal:
         segmentStiffness = 300
         segmentDamping = 0.7
         
-        netLeft = self.topLeft[0] + self.stiffnessGap + 2 * self.postRadius + self.segmentLengthX / 2
-        netTop = self.topLeft[1] + self.postRadius - self.netThickness / 2
+        netLeft = self.rect.left + self.stiffnessGap + 2 * self.postRadius
+        netTop = self.rect.top + self.postRadius - self.netThickness / 2
         segmentGap = self.segmentLengthY + 2 * self.netThickness
         
         netSegmentSpritesX = []

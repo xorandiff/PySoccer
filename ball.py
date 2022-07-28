@@ -4,7 +4,7 @@ class BallLogic:
     def __init__(self, centerPosition, radius: int, collisionType: int):
         # Create a body for the ball with position matching its sprite
         self.body = pymunk.Body(moment=2.0)
-        self.body.position = centerPosition
+        self.body.position = tuple(centerPosition)
         
         # Create a circle shape for the ball
         self.shape = pymunk.Circle(self.body, radius)

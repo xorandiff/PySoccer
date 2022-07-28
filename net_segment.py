@@ -22,10 +22,10 @@ PyMunk physics. NetSegment objects may impact heavily
 on performance, if goal nets are very dense.
 """
 class NetSegment(pygame.sprite.Sprite):
-    def __init__(self, centerPosition: tuple[float, float], size: tuple[float], angle = 0):
+    def __init__(self, positionCenter: tuple[float, float], size: tuple[float], angle = 0):
         pygame.sprite.Sprite.__init__(self)
         
-        self.centerPosition = centerPosition
+        self.positionCenter = positionCenter
         self.angle = angle
         self.size = self.width, self.height = size
                 
@@ -38,10 +38,10 @@ class NetSegment(pygame.sprite.Sprite):
         self.image_copy.fill((255, 255, 255))
         
         self.rect = self.image.get_rect()
-        self.rect.center = self.centerPosition
+        self.rect.center = self.positionCenter
         
     def update(self):
-        self.rect.center = self.centerPosition
+        self.rect.center = self.positionCenter
         center = self.rect.center
         self.image = pygame.transform.rotate(self.image_copy, self.angle)
         self.rect = self.image.get_rect()

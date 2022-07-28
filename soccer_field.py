@@ -24,12 +24,12 @@ class SoccerFieldLogic:
             wall.elasticity = 1
 
 class SoccerField(pygame.sprite.Sprite):
-    def __init__(self, grassTileSize: tuple[int, int]):
+    def __init__(self, grassTileSize: tuple[int, int], circleRadius: float, lineWidth: float):
         pygame.sprite.Sprite.__init__(self)
         
         self.SCREEN_WIDTH, self.SCREEN_HEIGHT = pygame.display.get_surface().get_size()
-        self.CIRCLE_RADIUS = self.SCREEN_HEIGHT / 5
-        self.LINE_WIDTH = 3
+        self.CIRCLE_RADIUS = circleRadius
+        self.LINE_WIDTH = lineWidth
         
         self.grassTileSize = self.grassTileWidth, self.grassTileHeight = grassTileSize
                         
