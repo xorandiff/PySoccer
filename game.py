@@ -1,5 +1,6 @@
 import threading, time, numpy
 import pygame, pymunk, pymunk.pygame_util, pygame_gui
+from multiprocessing import Queue
 from numpy import array
 from pymunk.vec2d import Vec2d
 
@@ -160,8 +161,8 @@ class Game:
 
         # Initialize game objects
         self.soccer_field = SoccerField(GRASS_TILE_SIZE, FIELD_CIRCLE_RADIUS, FIELD_LINE_WIDTH)
-        self.leftGoal = Goal(GOAL_SIZE, self.area.midleft + UNIT_X * GOAL_CENTER_GAP, 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (0, 0, GOAL_NET_NONCOLLISION_LAYERS, 0), (False, False, True, False), COLLISION_TYPE_GOAL_POST)
-        self.rightGoal = Goal(GOAL_SIZE, self.area.midright - UNIT_X * GOAL_CENTER_GAP, 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (GOAL_NET_NONCOLLISION_LAYERS, 0, 0, 0), (True, False, False, False), COLLISION_TYPE_GOAL_POST)
+        self.leftGoal = Goal(GOAL_SIZE, tuple(self.area.midleft + UNIT_X * GOAL_CENTER_GAP), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (0, 0, GOAL_NET_NONCOLLISION_LAYERS, 0), (False, False, True, False), COLLISION_TYPE_GOAL_POST)
+        self.rightGoal = Goal(GOAL_SIZE, tuple(self.area.midright - UNIT_X * GOAL_CENTER_GAP), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (GOAL_NET_NONCOLLISION_LAYERS, 0, 0, 0), (True, False, False, False), COLLISION_TYPE_GOAL_POST)
         self.goals = [ self.leftGoal, self.rightGoal ]
         self.goalSprites = [ goal.sprites for goal in self.goals ]
         
@@ -174,7 +175,7 @@ class Game:
         self.goalkeeper = self.players[1]
 
         # Create sprite group containing all game sprites
-        self.allSprites = pygame.sprite.RenderPlain((self.soccer_field, self.ball, *self.players, *self.goalSprites))
+        self.allSprites = pygame.sprite.RenderPlain(self.soccer_field, self.ball, *self.players, *self.goalSprites)
 
     def hideMenu(self):
         for item in self.menu:
@@ -236,7 +237,7 @@ class Game:
             self.manager.draw_ui(self.screen)
             
             # Draw debug images
-            options = pymunk.pygame_util.DrawOptions(self.screen)
+            #options = pymunk.pygame_util.DrawOptions(self.screen)
             """ with self.logic.lock: """
             """     self.logic.space.debug_draw(options) """
 
