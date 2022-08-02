@@ -1,6 +1,6 @@
 from twisted.internet.protocol import Protocol, ClientFactory
 from twisted.internet import reactor
-from multiprocessing import Process, Pipe
+from multiprocessing import Process
 from sys import stdout
 import threading
 
@@ -8,13 +8,24 @@ HOST = "127.0.0.1"
 PORT = 1838
 
 class PySoccerClient(Protocol):
-        def __init__(self, conn):
-            Protocol.__init__(self)
-            self.conn = conn
+    def __init__(self, conn):
+        Protocol.__init__(self)
+        self.conn = conn
 
-        def dataReceived(self, data):
-            stdout.write(str(data))
-            self.conn.send(str(data))
+    def dataReceived(self, data):
+        self.conn.send(data.decode())
+        
+    def connectionMade(self):
+        self.start_loop()
+        
+    def _loop(self):
+        while True:
+            message = self.conn.recv()
+            print(f"Sending '{message}'...")
+            self.transport.write(str.encode(message))
+            
+    def start_loop(self):
+        threading.Thread(target=self._loop, daemon=True).start()
 class PySoccerClientFactory(ClientFactory):
     def __init__(self, conn):
         ClientFactory.__init__(self)
@@ -37,17 +48,8 @@ class PySoccerClientFactory(ClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         print('Connection to game server failed. Reason:', reason)
-        self.conn.send("CONNECTION_LOST")
-        
-    def _loop(self):
-        while True:
-            message = self.conn.recv()
-            print(f"Received message to sen: {message}")
-            self.c
-            
-    def start_loop(self):
-        threading.Thread(target=self._loop, daemon=True).start()
-        
+        self.conn.send("DISCONNECTED")
+
 class ClientProcess(Process):
     def __init__(self, conn):
         Process.__init__(self)
@@ -58,5 +60,4 @@ class ClientProcess(Process):
     def run(self):
         clientFactory = PySoccerClientFactory(self.conn)
         reactor.connectTCP(HOST, PORT, clientFactory) # type: ignore[attr-defined]
-        clientFactory.start_loop()
         reactor.run() # type: ignore[attr-defined]
