@@ -1,6 +1,6 @@
 import threading, time, numpy
 import pygame, pymunk, pymunk.pygame_util, pygame_gui
-from multiprocessing import Queue
+from multiprocessing import Pipe
 from numpy import array
 from pymunk.vec2d import Vec2d
 
@@ -11,6 +11,17 @@ from player import Player, PlayerLogic
 from ball import Ball, BallLogic
 from soccer_field import SoccerField, SoccerFieldLogic
 from goal import Goal
+
+class Receiver:
+    def __init__(self, conn):
+        self.conn = conn
+        self.lock = threading.Lock()
+    def _loop(self):
+        while True:
+            message = self.conn.recv()
+            print(f"Received message: {message}")
+    def start_loop(self):
+        threading.Thread(target=self._loop, daemon=True).start()
 
 class Logic:
     def __init__(self, screenSize, fps):
@@ -83,6 +94,7 @@ class Logic:
         
         if playerGoalDistance < GK_MAX_GOAL_DISTANCE and playerBallDistance <= GK_MIN_APPROACH_DISTANCE + GK_MAX_GOAL_DISTANCE:
             v = Vec2d(*self.ball.body.position) - Vec2d(*player.body.position)
+            v = v.scale_to_length(1.0)
             
             player.sprint = False
             if playerBallDistance <= GK_MIN_APPROACH_DISTANCE + PLAYER_RADIUS + BALL_RADIUS:
@@ -93,6 +105,7 @@ class Logic:
             baseDistance = Vec2d.get_distance(player.body.position, Vec2d(*GK_RIGHT_STARTPOS))
             if (baseDistance > 10):
                 v = Vec2d(*GK_RIGHT_STARTPOS) - Vec2d(*player.body.position)
+                v = v.scale_to_length(1.0)
                 player.walk(v.int_tuple)
     
     def _loop(self):
@@ -135,6 +148,7 @@ class Logic:
                 self.player.walk(UNIT_Y)
             
             self.player.update()
+            self.goalkeeper.update()
             self.goalkeeperAi(self.goalkeeper, self.rightGoal)
             
             self.space.step(1 / self._fps)
@@ -144,8 +158,11 @@ class Logic:
         threading.Thread(target=self._loop, daemon=True).start()
 
 class Game:
-    def __init__(self):
+    def __init__(self, conn):
         pygame.display.set_caption(WINDOW_TITLE)
+        
+        self.receiver = Receiver(conn)
+        self.clientMessages = []
         
         self.logic = Logic(SCREEN_SIZE, FPS)
         self.running = True        
@@ -188,6 +205,7 @@ class Game:
     def start(self):
         #time.sleep(0.5)
         self.logic.start_loop()
+        self.receiver.start_loop()
         # Game loop
         while self.running:            
             for event in pygame.event.get():
@@ -248,8 +266,10 @@ class Game:
         quit()
 
 if __name__ == "__main__":
-    game = Game()
-    client = ClientProcess()
+    gameConn, clientConn = Pipe()
+    
+    game = Game(gameConn)
+    client = ClientProcess(clientConn)
     
     client.start()
     game.start()

@@ -1,10 +1,12 @@
 import pygame, pymunk
 import numpy as np
+from numpy.typing import ArrayLike
+from pygame.rect import Rect
 class PlayerLogic:
     # Sprint boolean
     sprint = False
     
-    def __init__(self, position: tuple[float, float], radius: float, walkingSpeed: float, sprintFactor: float, sprintEnergy: float, sprintEnergyDrop: float):
+    def __init__(self, position: ArrayLike, radius: float, walkingSpeed: float, sprintFactor: float, sprintEnergy: float, sprintEnergyDrop: float):
         self.radius = radius
         self.speed = walkingSpeed
         self.sprintFactor = float(sprintFactor)
@@ -15,7 +17,7 @@ class PlayerLogic:
         
         # Create a body for the player with position matching its sprite
         self.body = pymunk.Body()
-        self.body.position = tuple(position)
+        self.body.position = tuple(np.array(position))
         
         # Custom velocity function to amend body damping to lower value, 
         # which results in sharper turns while walking
@@ -40,16 +42,15 @@ class PlayerLogic:
         self.body.angle = 0
 
     # Method used for moving the player
-    def walk(self, direction: np.ndarray):        
+    def walk(self, direction: ArrayLike):        
         # Set player speed for walk/sprint
         speed = self.speed * self.sprintFactor if self.sprint and self.sprintEnergy > 0 else self.speed
-        print(tuple(direction * speed))
         # Apply impulse to move the player in desired direction
-        self.body.apply_impulse_at_local_point(direction * speed)
+        self.body.apply_impulse_at_local_point(tuple(np.array(direction) * speed))
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, centerPosition: tuple[float, float], radius: float):
+    def __init__(self, centerPosition: ArrayLike, radius: float):
         pygame.sprite.Sprite.__init__(self)
         
         self.centerPosition = centerPosition
@@ -60,9 +61,9 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(pygame.image.load("img/player.png"), (self.sideLength, self.sideLength))
         
         # Set initial player position
-        self.rect = self.image.get_rect()
-        self.rect.center = centerPosition
+        self.rect: Rect = self.image.get_rect()
+        self.rect.center = tuple(np.array(centerPosition))
 
     def update(self):
-        self.rect.center = self.centerPosition
+        self.rect.center = tuple(np.array(self.centerPosition))
 

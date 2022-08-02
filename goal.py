@@ -10,7 +10,7 @@ Goal class for handling PyGame sprite and
 PyMunk physics
 """
 class Goal:
-    def __init__(self, size: tuple[int, int], positionCenter: tuple[int, int], angle: int, postRadius: int, netThickness: int, segmentCounts: tuple[int, int], noCollisionLayers: tuple[int, int, int, int], crossbarPinSides: tuple[bool, bool, bool, bool], postCollisionType: int):
+    def __init__(self, size: tuple[float, float], positionCenter: tuple[float, float], angle: float, postRadius: float, netThickness: float, segmentCounts: tuple[int, int], noCollisionLayers: tuple[int, int, int, int], crossbarPinSides: tuple[bool, bool, bool, bool], postCollisionType: int):
         self.size = self.width, self.height = size
         self.center = self.centerX, self.centerY = positionCenter
         self.angle = angle
@@ -24,7 +24,7 @@ class Goal:
         self.segmentLengthX = (self.width - self.stiffnessGap - 4 * self.postRadius) / self.segmentCountX
         self.segmentLengthY = (self.height - 2 * self.stiffnessGap - 4 * self.postRadius) / self.segmentCountY
         
-        self.rect = pygame.Rect(np.array(positionCenter) - np.array(self.size) / 2, self.size)
+        self.rect = pygame.Rect(tuple(np.array(positionCenter) - np.array(self.size) / 2), self.size)
         self.postsRect = self.rect.inflate(-self.postRadius, -self.postRadius)
                 
         self.postPositions = [ self.postsRect.topleft, self.postsRect.topright, self.postsRect.bottomleft, self.postsRect.bottomright ]
@@ -134,4 +134,4 @@ class Goal:
         self.sprites = self.postSprites + self.netSegmentSprites
         self.bodies = [ x.body for x in self.logics ]
         self.shapes = [ x.shape for x in self.logics ]
-        self.spaceObjects = self.bodies + self.shapes + self.netJoints
+        self.spaceObjects = [ *self.bodies, *self.shapes, *self.netJoints ]

@@ -1,8 +1,9 @@
 import pygame, pymunk
+from pygame.rect import Rect
 from pymunk.vec2d import Vec2d
 
 class NetSegmentLogic:
-    def __init__(self, start: tuple[int, int], end: tuple[int, int], thickness, angle = 0):
+    def __init__(self, start: tuple[float, float], end: tuple[float, float], thickness, angle = 0.):
         self.start, self.end = start, end
         self.size = self.width, self.height = Vec2d.get_distance(Vec2d(*start), Vec2d(*end)), thickness * 2
         
@@ -22,7 +23,7 @@ PyMunk physics. NetSegment objects may impact heavily
 on performance, if goal nets are very dense.
 """
 class NetSegment(pygame.sprite.Sprite):
-    def __init__(self, positionCenter: tuple[float, float], size: tuple[float], angle = 0):
+    def __init__(self, positionCenter: tuple[float, float], size: tuple[float, float], angle = 0):
         pygame.sprite.Sprite.__init__(self)
         
         self.positionCenter = positionCenter
@@ -37,11 +38,11 @@ class NetSegment(pygame.sprite.Sprite):
         self.image_copy.set_colorkey((0, 0, 0))
         self.image_copy.fill((255, 255, 255))
         
-        self.rect = self.image.get_rect()
-        self.rect.center = self.positionCenter
+        self.rect: Rect = self.image.get_rect()
+        self.rect.center = tuple(map(int, self.positionCenter))
         
     def update(self):
-        self.rect.center = self.positionCenter
+        self.rect.center = tuple(map(int, self.positionCenter))
         center = self.rect.center
         self.image = pygame.transform.rotate(self.image_copy, self.angle)
         self.rect = self.image.get_rect()

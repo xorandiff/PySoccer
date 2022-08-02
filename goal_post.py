@@ -1,4 +1,5 @@
 import pygame, pymunk, pymunk.pygame_util
+from pygame.rect import Rect
 
 class GoalPostLogic:
     def __init__(self, positionCenter: tuple[float, float], radius: float, collisionType: int):
@@ -24,8 +25,8 @@ class GoalPost(pygame.sprite.Sprite):
         # Initialize the goal post surface
         self.image = pygame.transform.scale(pygame.image.load("img/goal_post.png"), (self.sideLength, self.sideLength))
         
-        self.rect = self.image.get_rect()
-        self.rect.center = self.positionCenter
+        self.rect: Rect = self.image.get_rect()
+        self.rect.center = tuple(map(int, self.positionCenter))
 
     def update(self):
         pass
