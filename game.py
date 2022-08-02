@@ -25,6 +25,8 @@ class Receiver:
 
 class Logic:
     def __init__(self, screenSize, fps):
+        self.clock = pygame.time.Clock()
+        self.timeDelta = 0.0
         self._size = screenSize
         self._fps = fps
         self._playerDirection = array([0, 0])
@@ -44,7 +46,7 @@ class Logic:
         self.goals = [ self.leftGoal, self.rightGoal ]
         self.goalSpaceObjects = self.leftGoal.spaceObjects + self.rightGoal.spaceObjects
         
-        self.space = pymunk.Space()
+        self.space = pymunk.Space(threaded=True)
         self.space.damping = SPACE_DAMPING
         self.space.collision_slop = SPACE_COLLISION_SLOP
         
@@ -152,7 +154,7 @@ class Logic:
             self.goalkeeperAi(self.goalkeeper, self.rightGoal)
             
             self.space.step(1 / self._fps)
-            time.sleep(1 / self._fps)
+            self.timeDelta = self.clock.tick(self._fps) / 1000.0
             
     def start_loop(self):
         threading.Thread(target=self._loop, daemon=True).start()
@@ -175,7 +177,10 @@ class Game:
         self.vs_human_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((UI_BUTTON_LEFT, UI_BUTTON_TOP + UI_BUTTON_GAP), UI_BUTTON_SIZE), text='Play against human', manager=self.manager)
 
         self.menu = [self.vs_ai_button, self.vs_human_button]
-
+        
+        self.debugPanel = pygame_gui.elements.UIPanel(relative_rect=pygame.Rect((0, 0), (SCREEN_WIDTH, 50)), starting_layer_height=1, manager=self.manager)
+        self.debugText = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((0, 0), (SCREEN_WIDTH, 50)), text="", container=self.debugPanel, parent_element=self.debugPanel, manager=self.manager)
+        
         # Initialize game objects
         self.soccer_field = SoccerField(GRASS_TILE_SIZE, FIELD_CIRCLE_RADIUS, FIELD_LINE_WIDTH)
         self.leftGoal = Goal(GOAL_SIZE, tuple(self.area.midleft + UNIT_X * GOAL_CENTER_GAP), 0, GOAL_POST_RADIUS, GOAL_NET_THICKNESS, GOAL_NET_DENSITY, (0, 0, GOAL_NET_NONCOLLISION_LAYERS, 0), (False, False, True, False), COLLISION_TYPE_GOAL_POST)
@@ -201,6 +206,12 @@ class Game:
     def showMenu(self):
         for item in self.menu:
             item.show()
+            
+    def toggleDebugInfo(self):
+        if self.debugPanel.visible:
+            self.debugPanel.hide()
+        else:
+            self.debugPanel.show()
     
     def start(self):
         #time.sleep(0.5)
@@ -221,6 +232,10 @@ class Game:
                     # Toogle fullscreen is CTRL+F is pressed
                     if key == pygame.K_f and (pygame.key.get_mods() & pygame.KMOD_LCTRL):
                         pygame.display.toggle_fullscreen()
+                    
+                    # Toggle debug information
+                    if key == pygame.K_F1:
+                        self.toggleDebugInfo()
                 elif event.type == pygame.KEYUP:
                     # Send information about keydown event to pymunk thread
                     with self.logic.lock:
@@ -233,9 +248,14 @@ class Game:
                         self.vs_human_button.disable()
                 
                 self.manager.process_events(event)
+                
+            with self.logic.lock:
+                timeDelta = self.logic.timeDelta
             
-            time_delta = self.clock.tick(FPS) / 1000.0
+            logicFPS = round(FPS - timeDelta * FPS)
             
+            currentFPS = round(FPS - self.clock.tick(logicFPS) * FPS / 1000)
+                        
             # Read sprite new positions computed by pymunk from physics thread
             with self.logic.lock:
                 self.player.centerPosition = self.logic.player.body.position
@@ -249,15 +269,17 @@ class Game:
                     sprite.angle = -numpy.degrees(body.angle)
                 
             self.allSprites.update()
-            self.manager.update(time_delta)
+            self.manager.update(timeDelta)
             
             self.allSprites.draw(self.screen)
             self.manager.draw_ui(self.screen)
             
-            # Draw debug images
-            #options = pymunk.pygame_util.DrawOptions(self.screen)
-            """ with self.logic.lock: """
-            """     self.logic.space.debug_draw(options) """
+            self.debugText.set_text(f"Current FPS/Default FPS: {logicFPS} / {FPS}")
+            
+            """ # Draw debug images
+            options = pymunk.pygame_util.DrawOptions(self.screen)
+            with self.logic.lock:
+                self.logic.space.debug_draw(options) """
 
             pygame.display.flip()
         
