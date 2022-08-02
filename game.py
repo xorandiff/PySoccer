@@ -33,6 +33,7 @@ class Logic:
         self._sound = Sound()
         self._walkingDirections = [False, False, False, False]
         
+        self.fps = fps
         self.playerPosition = array(self._size) / 2 - UNIT_X * FIELD_CIRCLE_RADIUS
         self.goalkeeperPosition = self._size[0] - GK_STARTPOS_GAP, self._size[1] / 2
         self.events = []
@@ -52,6 +53,9 @@ class Logic:
         
         # Add PyMunk shapes and bodies into space
         self.space.add(self.player.body, self.player.shape, self.goalkeeper.body, self.goalkeeper.shape, self.ball.body, self.ball.shape, *self.soccerField.walls, *self.goalSpaceObjects)
+        
+        postCollisionHandler = self.space.add_collision_handler(COLLISION_TYPE_BALL, COLLISION_TYPE_GOAL_POST)
+        postCollisionHandler.begin = self.goal_post_hit
         
         self.lock = threading.Lock()
         
@@ -155,6 +159,7 @@ class Logic:
             
             self.space.step(1 / self._fps)
             self.timeDelta = self.clock.tick(self._fps) / 1000.0
+            self.fps = self.clock.get_fps()
             
     def start_loop(self):
         threading.Thread(target=self._loop, daemon=True).start()
@@ -180,6 +185,7 @@ class Game:
         
         self.debugPanel = pygame_gui.elements.UIPanel(relative_rect=pygame.Rect((0, 0), (SCREEN_WIDTH, 50)), starting_layer_height=1, manager=self.manager)
         self.debugText = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((0, 0), (SCREEN_WIDTH, 50)), text="", container=self.debugPanel, parent_element=self.debugPanel, manager=self.manager)
+        self.debugPanel.hide()
         
         # Initialize game objects
         self.soccer_field = SoccerField(GRASS_TILE_SIZE, FIELD_CIRCLE_RADIUS, FIELD_LINE_WIDTH)
@@ -251,10 +257,9 @@ class Game:
                 
             with self.logic.lock:
                 timeDelta = self.logic.timeDelta
-            
-            logicFPS = round(FPS - timeDelta * FPS)
-            
-            currentFPS = round(FPS - self.clock.tick(logicFPS) * FPS / 1000)
+                logicFPS = int(self.logic.fps)
+                        
+            self.clock.tick(logicFPS)
                         
             # Read sprite new positions computed by pymunk from physics thread
             with self.logic.lock:
