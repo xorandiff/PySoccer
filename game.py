@@ -1,5 +1,6 @@
 import threading, numpy
 import pygame, pymunk, pymunk.pygame_util, pygame_gui
+from queue import Queue
 from multiprocessing import Pipe
 from numpy import array
 from pymunk.vec2d import Vec2d
@@ -13,17 +14,18 @@ from soccer_field import SoccerField, SoccerFieldLogic
 from goal import Goal
 
 class Receiver:
-    def __init__(self, conn):
+    def __init__(self, conn, queue: Queue):
         self.conn = conn
         self.serverMessages = []
-        self.lock = threading.Lock()
-    def _loop(self):
+        self.queue = queue
+
+    def _loop(self, queue: Queue):
         while True:
             message = self.conn.recv()
-            with self.lock:
-                self.serverMessages.append(message)
+            self.queue.put_nowait(message)
+
     def start_loop(self):
-        threading.Thread(target=self._loop, daemon=True).start()
+        threading.Thread(target=self._loop, args=(self.queue,), daemon=True).start()
 
 class Logic:
     def __init__(self, conn, screenSize, fps):
@@ -210,7 +212,8 @@ class Game:
         pygame.display.set_caption(WINDOW_TITLE)
         
         self.conn = conn
-        self.receiver = Receiver(conn)
+        self.serverMessagesQueue = Queue()
+        self.receiver = Receiver(conn, self.serverMessagesQueue)
         self.isNetworkGame = False
         self.isConnected = False
         
@@ -271,34 +274,34 @@ class Game:
         self.receiver.start_loop()
         # Game loop
         while self.running:
-            serverMessage = ""
-            with self.receiver.lock:
-                if len(self.receiver.serverMessages):
-                    serverMessage = self.receiver.serverMessages.pop(0)
-                    if "JOINED" in serverMessage:
-                        self.hideMenu()
-                        if serverMessage == "JOINED_2":
-                            self.isTeamLeft = False
-                            self.player = self.opponent
-                            self.opponent = self.players[0]
-                            with self.logic.lock:
-                                t = self.logic.player
-                                self.logic.player = self.logic.opponent
-                                self.logic.opponent = t
-                        self.isNetworkGame = True
+            # Get server messages stored in queue
+            if not self.serverMessagesQueue.empty():
+                serverMessage = self.serverMessagesQueue.get()
+                self.serverMessagesQueue.task_done()
+                if "JOINED" in serverMessage:
+                    self.hideMenu()
+                    if serverMessage == "JOINED_2":
+                        self.isTeamLeft = False
+                        self.player = self.opponent
+                        self.opponent = self.players[0]
                         with self.logic.lock:
-                            self.logic.isNetworkGame = True
-                    elif "_" in serverMessage:
-                        for event in serverMessage.split(" "):
-                            if "_" in event:
-                                with self.logic.lock:
-                                    self.logic.opponentEvents.append(event)
-                    elif serverMessage == "CONNECTED":
-                        self.isConnected = True
-                        self.vs_human_button.enable()
-                    elif serverMessage == "DISCONNECTED":
-                        self.isConnected = False
-                        self.vs_human_button.disable()
+                            t = self.logic.player
+                            self.logic.player = self.logic.opponent
+                            self.logic.opponent = t
+                    self.isNetworkGame = True
+                    with self.logic.lock:
+                        self.logic.isNetworkGame = True
+                elif "_" in serverMessage:
+                    for event in serverMessage.split(" "):
+                        if "_" in event:
+                            with self.logic.lock:
+                                self.logic.opponentEvents.append(event)
+                elif serverMessage == "CONNECTED":
+                    self.isConnected = True
+                    self.vs_human_button.enable()
+                elif serverMessage == "DISCONNECTED":
+                    self.isConnected = False
+                    self.vs_human_button.disable()
             
             for event in pygame.event.get():
                 # Send information about event to pymunk thread
