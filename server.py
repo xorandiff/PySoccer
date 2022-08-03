@@ -45,6 +45,8 @@ class PySoccerServer(LineReceiver):
                 self.factory.playerQueue.append(self)      
         elif message == "PING":
             self.send("PONG")
+        elif "KICK" in message:
+            self.send(message)
 
     def send(self, line: str):
         self.sendLine(str.encode(line))

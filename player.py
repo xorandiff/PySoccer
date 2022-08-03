@@ -27,8 +27,17 @@ class PlayerLogic:
         self.shape = pymunk.Circle(self.body, self.radius)
         self.shape.friction = 1.0
         self.shape.mass = 2
+        
+        self.defaultKickCooldown = 100
+        self.kickCooldown = self.defaultKickCooldown
+        
+    def resetKickCooldown(self):
+        self.kickCooldown = self.defaultKickCooldown
 
     def update(self):
+        if self.kickCooldown:
+            self.kickCooldown -= 1
+        
         if self.sprintEnergy > 0 and self.sprint:
             self.sprintEnergy -= self.sprintEnergyDrop
             if self.sprintEnergy < 0:

@@ -5,7 +5,8 @@ from multiprocessing import Process
 from sys import stdout
 import threading
 
-HOST = "146.59.93.188"
+#HOST = "146.59.93.188"
+HOST = "127.0.0.1"
 PORT = 1838
 
 class PySoccerClient(LineReceiver):

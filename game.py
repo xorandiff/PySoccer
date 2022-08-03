@@ -71,6 +71,10 @@ class Logic:
         self.lock = threading.Lock()
         
     def ballKick(self, player: PlayerLogic):
+        if player.kickCooldown:
+            return
+        else:
+            player.resetKickCooldown()
         # Get distance between center points of player and ball
         playerBallDistance = Vec2d.get_distance(player.body.position, self.ball.body.position)
         
@@ -93,9 +97,16 @@ class Logic:
             # Get kick force vector and scale it to kickForce value
             kickForceVector = Vec2d.scale_to_length(self.ball.body.position - player.body.position, kickForce)
             
-            self.ball.body.apply_impulse_at_local_point(kickForceVector)
-            self.ball.body.angular_velocity += 10
-            self._sound.kick()
+            with self.lock:
+                if self.isNetworkGame:
+                    self.conn.send(f"KICK_{round(kickForceVector.x, 2)}_{round(kickForceVector.y, 2)}")
+                else:
+                    self.ballApplyKick(kickForceVector)
+    
+    def ballApplyKick(self, kickForceVector):
+        self.ball.body.apply_impulse_at_local_point(kickForceVector)
+        self.ball.body.angular_velocity += 10
+        self._sound.kick()
     
     def goal_post_hit(self, arbiter, space, data):
         if self.ball.body.velocity.length > 300:
@@ -312,6 +323,11 @@ class Game:
                     self.newGame()
                 elif serverMessage == "LEFT":
                     self.endGame()
+                elif "KICK" in serverMessage:
+                    messageParts = serverMessage.split("_")
+                    kickForceVector = Vec2d(float(messageParts[1]), float(messageParts[2]))
+                    with self.logic.lock:
+                        self.logic.ballApplyKick(kickForceVector)
                 elif serverMessage == "PONG":
                     self.ping = pygame.time.get_ticks() - self.pingTimeMark
                 elif "_" in serverMessage:
@@ -388,7 +404,8 @@ class Game:
             self.allSprites.draw(self.screen)
             self.manager.draw_ui(self.screen)
             
-            self.debugText.set_text(f"Current FPS/Default FPS: {logicFPS} / {FPS}, Ping {self.ping}ms")
+            with self.logic.lock:
+                self.debugText.set_text(f"Current FPS/Default FPS: {logicFPS} / {FPS}, Ping {self.ping}ms, Player kick cooldown: {self.logic.player.kickCooldown}")
             
             """ # Draw debug images
             options = pymunk.pygame_util.DrawOptions(self.screen)
