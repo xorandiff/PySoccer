@@ -9,28 +9,45 @@ class PySoccerServer(protocol.Protocol):
     
     def connectionMade(self):
         self.factory.numProtocols += 1
-        print(f"New client connected (IPv4: {self.transport.getHost().host}, total connections: {self.factory.numProtocols})")
+        print(f"New client connected (IPv4: {self.transport.getHost().host}, total connections: {self.factory.numProtocols})") # type: ignore[attr-defined]
     
     def connectionLost(self, reason):
         self.factory.numProtocols -= 1
+        
+        # Notify player opponent (if exist) about leaving the game
+        if self.opponent:
+            self.opponent.send("LEFT")
+        
+        # Remove current player from game queue, if present
+        if self in self.factory.playerQueue:
+            self.factory.playerQueue.remove(self)
     
     def dataReceived(self, data):
         message = data.decode()
         print(f"Received from client: {message}")
+        
+        # Pass data to player's opponet (if exist)
         if self.opponent:
             self.opponent.send(message)
+            
+        # Handle join game request from player
         if message == "JOIN":
             if len(self.factory.playerQueue):
+                # If waiting queue is nonempty, then pair with player from queue
                 self.opponent = self.factory.playerQueue.pop(0)
                 self.opponent.opponent = self
                 
                 self.send("JOINED_2")
                 self.opponent.send("JOINED_1")
             else:
+                # If waiting queue is empty, add player to queue
                 self.factory.playerQueue.append(self)
+                
+        if message == "PING":
+            self.send("PONG")
 
     def send(self, message: str):
-        self.transport.write(str.encode(message))
+        self.transport.write(str.encode(message)) # type: ignore[attr-defined]
 
 class PySoccerServerFactory(protocol.Factory):
     def __init__(self):
@@ -44,4 +61,4 @@ class PySoccerServerFactory(protocol.Factory):
 endpoints.TCP4ServerEndpoint(reactor, PORT).listen(PySoccerServerFactory())
 print(f"PySoccer Server started listening on port {PORT}")
 
-reactor.run()
+reactor.run() # type: ignore[attr-defined]

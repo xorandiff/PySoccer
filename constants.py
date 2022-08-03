@@ -7,8 +7,8 @@ pygame.init()
 Main constants
 """
 WINDOW_TITLE = "PySoccer"
-FPS = 300
-SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = pygame.display.get_desktop_sizes()[1]
+FPS = 60
+SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = pygame.display.get_desktop_sizes()[1] # type: ignore[attr-defined]
 
 SPACE_DAMPING = 0.4        # Objects will loose 60% of their velocity per second
 SPACE_COLLISION_SLOP = 0.2 # Object overlapping, higher value = better simulation stability
@@ -18,6 +18,9 @@ COLLISION_TYPE_BALL = 2
 COLLISION_TYPE_WALL = 3
 COLLISION_TYPE_GOAL_POST = 4
 COLLISION_TYPE_GOAL_NET = 5
+
+TEAM_BLUE = 1
+TEAM_RED = 2
 
 """
 Goal constants

@@ -1,3 +1,4 @@
+from math import floor
 import threading, numpy
 import pygame, pymunk, pymunk.pygame_util, pygame_gui
 from queue import Queue
@@ -217,8 +218,12 @@ class Game:
         self.isNetworkGame = False
         self.isConnected = False
         
+        self.ping = 0
+        self.pingTimeMark = 0
+        
         self.logic = Logic(conn, SCREEN_SIZE, FPS)
-        self.running = True        
+        self.running = True
+        self.gameInProgress = False
         self.screen = pygame.display.set_mode(SCREEN_SIZE, pygame.SCALED)
         self.manager = pygame_gui.UIManager(SCREEN_SIZE, 'theme.json')
         self.area = pygame.display.get_surface().get_rect()
@@ -268,18 +273,31 @@ class Game:
             self.debugPanel.hide()
         else:
             self.debugPanel.show()
+            
+    def newGame(self):
+        self.gameInProgress = True
+        self.hideMenu()
+        
+    def endGame(self):
+        self.isNetworkGame = False
+        with self.logic.lock:
+            self.logic.isNetworkGame = False
+        self.gameInProgress = False
+        self.showMenu()
     
     def start(self):
         self.logic.start_loop()
         self.receiver.start_loop()
+        
+        timer = 0
+        
         # Game loop
         while self.running:
             # Get server messages stored in queue
             if not self.serverMessagesQueue.empty():
                 serverMessage = self.serverMessagesQueue.get()
-                self.serverMessagesQueue.task_done()
-                if "JOINED" in serverMessage:
-                    self.hideMenu()
+                
+                if serverMessage in ["JOINED_1", "JOINED_2"]:
                     if serverMessage == "JOINED_2":
                         self.isTeamLeft = False
                         self.player = self.opponent
@@ -291,6 +309,11 @@ class Game:
                     self.isNetworkGame = True
                     with self.logic.lock:
                         self.logic.isNetworkGame = True
+                    self.newGame()
+                elif serverMessage == "LEFT":
+                    self.endGame()
+                elif serverMessage == "PONG":
+                    self.ping = pygame.time.get_ticks() - self.pingTimeMark
                 elif "_" in serverMessage:
                     for event in serverMessage.split(" "):
                         if "_" in event:
@@ -302,11 +325,14 @@ class Game:
                 elif serverMessage == "DISCONNECTED":
                     self.isConnected = False
                     self.vs_human_button.disable()
+                
+                self.serverMessagesQueue.task_done()
             
             for event in pygame.event.get():
                 # Send information about event to pymunk thread
-                with self.logic.lock:
-                    self.logic.events.append(event)
+                if self.gameInProgress:
+                    with self.logic.lock:
+                        self.logic.events.append(event)
                 
                 if event.type == pygame.QUIT:
                     self.running = False
@@ -321,7 +347,7 @@ class Game:
                         self.toggleDebugInfo()
                 elif event.type == pygame_gui.UI_BUTTON_PRESSED:
                     if event.ui_element == self.vs_ai_button:
-                        self.hideMenu()
+                        self.newGame()
                     elif event.ui_element == self.vs_human_button:
                         self.vs_human_button.set_text("Finding player...")
                         self.vs_human_button.disable()
@@ -331,11 +357,18 @@ class Game:
                 self.manager.process_events(event)
                 
             with self.logic.lock:
-                timeDelta = self.logic.timeDelta
-                logicFPS = int(self.logic.fps)
-                        
-            self.clock.tick(logicFPS)
-                        
+                logicFPS = floor(self.logic.fps)
+            
+            # Adjust rendering graphics to logic render time
+            timeDelta = self.clock.tick(logicFPS) / 1000.0
+            
+            timer += timeDelta
+            
+            if timer >= 1:
+                self.pingTimeMark = pygame.time.get_ticks()
+                self.conn.send("PING")
+                timer = 0
+                                    
             # Read sprite new positions computed by pymunk from physics thread
             with self.logic.lock:
                 self.player.centerPosition = self.logic.player.body.position
@@ -355,7 +388,7 @@ class Game:
             self.allSprites.draw(self.screen)
             self.manager.draw_ui(self.screen)
             
-            self.debugText.set_text(f"Current FPS/Default FPS: {logicFPS} / {FPS}")
+            self.debugText.set_text(f"Current FPS/Default FPS: {logicFPS} / {FPS}, Ping {self.ping}ms")
             
             """ # Draw debug images
             options = pymunk.pygame_util.DrawOptions(self.screen)

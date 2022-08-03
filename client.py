@@ -4,7 +4,7 @@ from multiprocessing import Process
 from sys import stdout
 import threading
 
-HOST = "127.0.0.1"
+HOST = "146.59.93.188"
 PORT = 1838
 
 class PySoccerClient(Protocol):
@@ -22,7 +22,7 @@ class PySoccerClient(Protocol):
         while True:
             message = self.conn.recv()
             print(f"Sending '{message}'...")
-            self.transport.write(str.encode(message))
+            self.transport.write(str.encode(message)) # type: ignore[attr-defined]
             
     def start_loop(self):
         threading.Thread(target=self._loop, daemon=True).start()
