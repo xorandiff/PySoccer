@@ -134,8 +134,8 @@ class Logic:
                 if event.type in [pygame.KEYDOWN, pygame.KEYUP]:
                     key = event.key
                     
-                    if not self.isNetworkGame:
-                        self.conn.send(f"{event.type}_{event.key} ")
+                    if self.isNetworkGame:
+                        self.conn.send(f"{event.type}_{event.key}")
                     
                     if key in [pygame.K_LEFT, pygame.K_a]:
                         self._playerWalkingDirections[0] = event.type == pygame.KEYDOWN
@@ -315,10 +315,8 @@ class Game:
                 elif serverMessage == "PONG":
                     self.ping = pygame.time.get_ticks() - self.pingTimeMark
                 elif "_" in serverMessage:
-                    for event in serverMessage.split(" "):
-                        if "_" in event:
-                            with self.logic.lock:
-                                self.logic.opponentEvents.append(event)
+                    with self.logic.lock:
+                        self.logic.opponentEvents.append(serverMessage)
                 elif serverMessage == "CONNECTED":
                     self.isConnected = True
                     self.vs_human_button.enable()
@@ -368,7 +366,7 @@ class Game:
             
             if timer >= 1 and self.isNetworkGame and self.gameInProgress:
                 self.pingTimeMark = pygame.time.get_ticks()
-                #self.conn.send("PING")
+                self.conn.send("PING")
                 timer = 0
                                     
             # Read sprite new positions computed by pymunk from physics thread
