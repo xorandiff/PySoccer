@@ -145,8 +145,9 @@ class Logic:
                 if event.type in [pygame.KEYDOWN, pygame.KEYUP]:
                     key = event.key
                     
-                    if self.isNetworkGame:
-                        self.conn.send(f"{event.type}_{event.key}")
+                    with self.lock:
+                        if self.isNetworkGame:
+                            self.conn.send(f"{event.type}_{event.key}")
                     
                     if key in [pygame.K_LEFT, pygame.K_a]:
                         self._playerWalkingDirections[0] = event.type == pygame.KEYDOWN
@@ -177,36 +178,36 @@ class Logic:
                 self.player.walk(-UNIT_Y)
             if self._playerWalkingDirections[3]:
                 self.player.walk(UNIT_Y)
-                
-            if self.isNetworkGame:
-                if len(self.opponentEvents):
-                    with self.lock:
-                        event = self.opponentEvents.pop(0)
-                    eventList = event.split("_")
-                    eventType = int(eventList[0])
-                    key = int(eventList[1])
-                    
-                    if key == pygame.K_SPACE and eventType == pygame.KEYDOWN:
-                        self.ballKick(self.opponent)
-                    
-                    if key in [pygame.K_LEFT, pygame.K_a]:
-                        self._opponentWalkingDirections[0] = eventType == pygame.KEYDOWN
-                    if key in [pygame.K_RIGHT, pygame.K_d]:
-                        self._opponentWalkingDirections[1] = eventType == pygame.KEYDOWN
-                    if key in [pygame.K_UP, pygame.K_w]:
-                        self._opponentWalkingDirections[2] = eventType == pygame.KEYDOWN
-                    if key in [pygame.K_DOWN, pygame.K_s]:
-                        self._opponentWalkingDirections[3] = eventType == pygame.KEYDOWN
-                
-                if self._opponentWalkingDirections[0]:
-                    self.opponent.walk(-UNIT_X)
-                if self._opponentWalkingDirections[1]:
-                    self.opponent.walk(UNIT_X)
-                if self._opponentWalkingDirections[2]:
-                    self.opponent.walk(-UNIT_Y)
-                if self._opponentWalkingDirections[3]:
-                    self.opponent.walk(UNIT_Y)
             
+            with self.lock:
+                if self.isNetworkGame:
+                    if len(self.opponentEvents):
+                        event = self.opponentEvents.pop(0)
+                        eventList = event.split("_")
+                        eventType = int(eventList[0])
+                        key = int(eventList[1])
+                        
+                        if key == pygame.K_SPACE and eventType == pygame.KEYDOWN:
+                            self.ballKick(self.opponent)
+                        
+                        if key in [pygame.K_LEFT, pygame.K_a]:
+                            self._opponentWalkingDirections[0] = eventType == pygame.KEYDOWN
+                        if key in [pygame.K_RIGHT, pygame.K_d]:
+                            self._opponentWalkingDirections[1] = eventType == pygame.KEYDOWN
+                        if key in [pygame.K_UP, pygame.K_w]:
+                            self._opponentWalkingDirections[2] = eventType == pygame.KEYDOWN
+                        if key in [pygame.K_DOWN, pygame.K_s]:
+                            self._opponentWalkingDirections[3] = eventType == pygame.KEYDOWN
+                    
+            if self._opponentWalkingDirections[0]:
+                self.opponent.walk(-UNIT_X)
+            if self._opponentWalkingDirections[1]:
+                self.opponent.walk(UNIT_X)
+            if self._opponentWalkingDirections[2]:
+                self.opponent.walk(-UNIT_Y)
+            if self._opponentWalkingDirections[3]:
+                self.opponent.walk(UNIT_Y)
+                
             self.player.update()
             self.opponent.update()
             self.goalkeeper.update()
