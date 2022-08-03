@@ -24,8 +24,8 @@ class PySoccerServer(protocol.Protocol):
                 self.opponent = self.factory.playerQueue.pop(0)
                 self.opponent.opponent = self
                 
-                self.send("JOINED")
-                self.opponent.send("JOINED")
+                self.send("JOINED_2")
+                self.opponent.send("JOINED_1")
             else:
                 self.factory.playerQueue.append(self)
 

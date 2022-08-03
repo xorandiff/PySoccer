@@ -132,7 +132,7 @@ class Logic:
                     key = event.key
                     
                     if self.isNetworkGame:
-                        self.conn.send(f"{event.type}_{event.key}")
+                        self.conn.send(f"{event.type}_{event.key} ")
                     
                     if key in [pygame.K_LEFT, pygame.K_a]:
                         self._playerWalkingDirections[0] = event.type == pygame.KEYDOWN
@@ -171,6 +171,9 @@ class Logic:
                     eventList = event.split("_")
                     eventType = int(eventList[0])
                     key = int(eventList[1])
+                    
+                    if key == pygame.K_SPACE and eventType == pygame.KEYDOWN:
+                        self.ballKick(self.opponent)
                     
                     if key in [pygame.K_LEFT, pygame.K_a]:
                         self._opponentWalkingDirections[0] = eventType == pygame.KEYDOWN
@@ -217,6 +220,7 @@ class Game:
         self.manager = pygame_gui.UIManager(SCREEN_SIZE, 'theme.json')
         self.area = pygame.display.get_surface().get_rect()
         self.clock = pygame.time.Clock()
+        self.isTeamLeft = True
 
         self.vs_ai_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((UI_BUTTON_LEFT, UI_BUTTON_TOP), UI_BUTTON_SIZE), text='Play against computer', manager=self.manager)
         self.vs_human_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((UI_BUTTON_LEFT, UI_BUTTON_TOP + UI_BUTTON_GAP), UI_BUTTON_SIZE), text='Play against human', manager=self.manager)
@@ -271,20 +275,30 @@ class Game:
             with self.receiver.lock:
                 if len(self.receiver.serverMessages):
                     serverMessage = self.receiver.serverMessages.pop(0)
-                    if "_" in serverMessage:
+                    if "JOINED" in serverMessage:
+                        self.hideMenu()
+                        if serverMessage == "JOINED_2":
+                            self.isTeamLeft = False
+                            self.player = self.opponent
+                            self.opponent = self.players[0]
+                            with self.logic.lock:
+                                t = self.logic.player
+                                self.logic.player = self.logic.opponent
+                                self.logic.opponent = t
+                        self.isNetworkGame = True
                         with self.logic.lock:
-                            self.logic.opponentEvents.append(serverMessage)
+                            self.logic.isNetworkGame = True
+                    elif "_" in serverMessage:
+                        for event in serverMessage.split(" "):
+                            if "_" in event:
+                                with self.logic.lock:
+                                    self.logic.opponentEvents.append(event)
                     elif serverMessage == "CONNECTED":
                         self.isConnected = True
                         self.vs_human_button.enable()
                     elif serverMessage == "DISCONNECTED":
                         self.isConnected = False
                         self.vs_human_button.disable()
-                    elif serverMessage == "JOINED":
-                        self.hideMenu()
-                        self.isNetworkGame = True
-                        with self.logic.lock:
-                            self.logic.isNetworkGame = True
             
             for event in pygame.event.get():
                 # Send information about event to pymunk thread
