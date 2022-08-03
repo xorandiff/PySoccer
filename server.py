@@ -47,7 +47,7 @@ class PySoccerServer(LineReceiver):
             self.send("PONG")
 
     def send(self, line: str):
-        self.sendLine(line)
+        self.sendLine(str.encode(line))
 
 class PySoccerServerFactory(protocol.Factory):
     def __init__(self):

@@ -14,7 +14,7 @@ class PySoccerClient(LineReceiver):
         self.conn = conn
 
     def lineReceived(self, line):
-        self.conn.send(line)
+        self.conn.send(line.decode())
         
     def connectionMade(self):
         self.start_loop()
