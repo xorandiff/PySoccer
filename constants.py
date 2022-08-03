@@ -7,7 +7,7 @@ pygame.init()
 Main constants
 """
 WINDOW_TITLE = "PySoccer"
-FPS = 60
+FPS = 300
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = pygame.display.get_desktop_sizes()[1] # type: ignore[attr-defined]
 
 SPACE_DAMPING = 0.4        # Objects will loose 60% of their velocity per second

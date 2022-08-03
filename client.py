@@ -1,4 +1,5 @@
 from twisted.internet.protocol import Protocol, ClientFactory
+from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor
 from multiprocessing import Process
 from sys import stdout
@@ -7,25 +8,24 @@ import threading
 HOST = "146.59.93.188"
 PORT = 1838
 
-class PySoccerClient(Protocol):
+class PySoccerClient(LineReceiver):
     def __init__(self, conn):
         Protocol.__init__(self)
         self.conn = conn
 
-    def dataReceived(self, data):
-        self.conn.send(data.decode())
+    def lineReceived(self, line):
+        self.conn.send(line)
         
     def connectionMade(self):
         self.start_loop()
-        
-    def _loop(self):
+
+    def _loop(self, conn):
         while True:
-            message = self.conn.recv()
-            print(f"Sending '{message}'...")
-            self.transport.write(str.encode(message)) # type: ignore[attr-defined]
+            message = conn.recv()
+            reactor.callLater(0.001, self.sendLine, message)
             
     def start_loop(self):
-        threading.Thread(target=self._loop, daemon=True).start()
+        threading.Thread(target=self._loop, args=(self.conn,), daemon=True).start()
 class PySoccerClientFactory(ClientFactory):
     def __init__(self, conn):
         ClientFactory.__init__(self)
@@ -42,7 +42,7 @@ class PySoccerClientFactory(ClientFactory):
         return PySoccerClient(self.conn)
 
     def clientConnectionLost(self, connector, reason):
-        print('Lost connection to game server.  Reason:', reason)
+        print('Lost connection to game server. Reason:', reason)
         self.conn.send("RECONNECTING")
         connector.connect()
 

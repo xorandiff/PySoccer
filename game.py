@@ -1,5 +1,5 @@
 from math import floor
-import threading, numpy
+import threading, numpy, queue
 import pygame, pymunk, pymunk.pygame_util, pygame_gui
 from queue import Queue
 from multiprocessing import Pipe
@@ -134,7 +134,7 @@ class Logic:
                 if event.type in [pygame.KEYDOWN, pygame.KEYUP]:
                     key = event.key
                     
-                    if self.isNetworkGame:
+                    if not self.isNetworkGame:
                         self.conn.send(f"{event.type}_{event.key} ")
                     
                     if key in [pygame.K_LEFT, pygame.K_a]:
@@ -294,8 +294,8 @@ class Game:
         # Game loop
         while self.running:
             # Get server messages stored in queue
-            if not self.serverMessagesQueue.empty():
-                serverMessage = self.serverMessagesQueue.get()
+            try:
+                serverMessage = self.serverMessagesQueue.get(block=False)
                 
                 if serverMessage in ["JOINED_1", "JOINED_2"]:
                     if serverMessage == "JOINED_2":
@@ -327,6 +327,8 @@ class Game:
                     self.vs_human_button.disable()
                 
                 self.serverMessagesQueue.task_done()
+            except queue.Empty:
+                pass
             
             for event in pygame.event.get():
                 # Send information about event to pymunk thread
@@ -349,8 +351,8 @@ class Game:
                     if event.ui_element == self.vs_ai_button:
                         self.newGame()
                     elif event.ui_element == self.vs_human_button:
-                        self.vs_human_button.set_text("Finding player...")
                         self.vs_human_button.disable()
+                        self.vs_human_button.set_text("Finding player...")
                         
                         self.conn.send("JOIN")
                 
@@ -364,9 +366,9 @@ class Game:
             
             timer += timeDelta
             
-            if timer >= 1:
+            if timer >= 1 and self.isNetworkGame and self.gameInProgress:
                 self.pingTimeMark = pygame.time.get_ticks()
-                self.conn.send("PING")
+                #self.conn.send("PING")
                 timer = 0
                                     
             # Read sprite new positions computed by pymunk from physics thread

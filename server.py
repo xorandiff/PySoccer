@@ -1,8 +1,9 @@
 from twisted.internet import protocol, reactor, endpoints
+from twisted.protocols.basic import LineReceiver
 
 PORT = 1838
 
-class PySoccerServer(protocol.Protocol):
+class PySoccerServer(LineReceiver):
     def __init__(self, factory):
         self.factory: PySoccerServerFactory = factory
         self.opponent: PySoccerServer | None = None
@@ -22,8 +23,8 @@ class PySoccerServer(protocol.Protocol):
         if self in self.factory.playerQueue:
             self.factory.playerQueue.remove(self)
     
-    def dataReceived(self, data):
-        message = data.decode()
+    def lineReceived(self, line):
+        message = line
         print(f"Received from client: {message}")
         
         # Pass data to player's opponet (if exist)
@@ -41,13 +42,12 @@ class PySoccerServer(protocol.Protocol):
                 self.opponent.send("JOINED_1")
             else:
                 # If waiting queue is empty, add player to queue
-                self.factory.playerQueue.append(self)
-                
-        if message == "PING":
+                self.factory.playerQueue.append(self)      
+        elif message == "PING":
             self.send("PONG")
 
-    def send(self, message: str):
-        self.transport.write(str.encode(message)) # type: ignore[attr-defined]
+    def send(self, line: str):
+        self.sendLine(line)
 
 class PySoccerServerFactory(protocol.Factory):
     def __init__(self):
