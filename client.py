@@ -18,11 +18,14 @@ class PySoccerClient(LineReceiver):
         
     def connectionMade(self):
         self.start_loop()
+        
+    def send(self, line: str):
+        self.sendLine(str.encode(line))
 
     def _loop(self, conn):
         while True:
             message = conn.recv()
-            reactor.callLater(0.001, self.sendLine, message)
+            reactor.callLater(0.001, self.send, message)
             
     def start_loop(self):
         threading.Thread(target=self._loop, args=(self.conn,), daemon=True).start()

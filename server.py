@@ -24,7 +24,7 @@ class PySoccerServer(LineReceiver):
             self.factory.playerQueue.remove(self)
     
     def lineReceived(self, line):
-        message = line
+        message = line.decode()
         print(f"Received from client: {message}")
         
         # Pass data to player's opponet (if exist)
