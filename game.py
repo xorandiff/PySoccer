@@ -1,5 +1,5 @@
 from math import floor
-import threading, numpy, queue
+import threading, numpy
 import pygame, pymunk, pymunk.pygame_util, pygame_gui
 from queue import Queue
 from multiprocessing import Pipe
@@ -13,20 +13,6 @@ from player import Player, PlayerLogic
 from ball import Ball, BallLogic
 from soccer_field import SoccerField, SoccerFieldLogic
 from goal import Goal
-
-class Receiver:
-    def __init__(self, conn, queue: Queue):
-        self.conn = conn
-        self.serverMessages = []
-        self.queue = queue
-
-    def _loop(self, queue: Queue):
-        while True:
-            message = self.conn.recv()
-            self.queue.put_nowait(message)
-
-    def start_loop(self):
-        threading.Thread(target=self._loop, args=(self.queue,), daemon=True).start()
 
 class Logic:
     def __init__(self, conn, screenSize, fps):
@@ -179,26 +165,26 @@ class Logic:
             if self._playerWalkingDirections[3]:
                 self.player.walk(UNIT_Y)
             
-            with self.lock:
-                if self.isNetworkGame:
-                    if len(self.opponentEvents):
-                        event = self.opponentEvents.pop(0)
-                        eventList = event.split("_")
-                        eventType = int(eventList[0])
-                        key = int(eventList[1])
-                        
-                        if key == pygame.K_SPACE and eventType == pygame.KEYDOWN:
-                            self.ballKick(self.opponent)
-                        
-                        if key in [pygame.K_LEFT, pygame.K_a]:
-                            self._opponentWalkingDirections[0] = eventType == pygame.KEYDOWN
-                        if key in [pygame.K_RIGHT, pygame.K_d]:
-                            self._opponentWalkingDirections[1] = eventType == pygame.KEYDOWN
-                        if key in [pygame.K_UP, pygame.K_w]:
-                            self._opponentWalkingDirections[2] = eventType == pygame.KEYDOWN
-                        if key in [pygame.K_DOWN, pygame.K_s]:
-                            self._opponentWalkingDirections[3] = eventType == pygame.KEYDOWN
-                    
+            
+            if len(self.opponentEvents):
+                with self.lock:
+                    event = self.opponentEvents.pop(0)
+                eventList = event.split("_")
+                eventType = int(eventList[0])
+                key = int(eventList[1])
+                
+                if key == pygame.K_SPACE and eventType == pygame.KEYDOWN:
+                    self.ballKick(self.opponent)
+                
+                if key in [pygame.K_LEFT, pygame.K_a]:
+                    self._opponentWalkingDirections[0] = eventType == pygame.KEYDOWN
+                if key in [pygame.K_RIGHT, pygame.K_d]:
+                    self._opponentWalkingDirections[1] = eventType == pygame.KEYDOWN
+                if key in [pygame.K_UP, pygame.K_w]:
+                    self._opponentWalkingDirections[2] = eventType == pygame.KEYDOWN
+                if key in [pygame.K_DOWN, pygame.K_s]:
+                    self._opponentWalkingDirections[3] = eventType == pygame.KEYDOWN
+
             if self._opponentWalkingDirections[0]:
                 self.opponent.walk(-UNIT_X)
             if self._opponentWalkingDirections[1]:
@@ -207,12 +193,12 @@ class Logic:
                 self.opponent.walk(-UNIT_Y)
             if self._opponentWalkingDirections[3]:
                 self.opponent.walk(UNIT_Y)
-                
+            
             self.player.update()
             self.opponent.update()
             self.goalkeeper.update()
             self.goalkeeperAi(self.goalkeeper, self.rightGoal)
-            
+        
             self.space.step(1 / self._fps)
             self.timeDelta = self.clock.tick(self._fps) / 1000.0
             self.fps = self.clock.get_fps()
@@ -226,7 +212,7 @@ class Game:
         
         self.conn = conn
         self.serverMessagesQueue = Queue()
-        self.receiver = Receiver(conn, self.serverMessagesQueue)
+        #self.receiver = Receiver(conn, self.serverMessagesQueue)
         self.isNetworkGame = False
         self.isConnected = False
         
@@ -299,15 +285,15 @@ class Game:
     
     def start(self):
         self.logic.start_loop()
-        self.receiver.start_loop()
+        #self.receiver.start_loop()
         
         timer = 0
         
         # Game loop
         while self.running:
             # Get server messages stored in queue
-            try:
-                serverMessage = self.serverMessagesQueue.get(block=False)
+            if self.conn.poll():
+                serverMessage = self.conn.recv()
                 
                 if serverMessage in ["JOINED_1", "JOINED_2"]:
                     if serverMessage == "JOINED_2":
@@ -340,10 +326,6 @@ class Game:
                 elif serverMessage == "DISCONNECTED":
                     self.isConnected = False
                     self.vs_human_button.disable()
-                
-                self.serverMessagesQueue.task_done()
-            except queue.Empty:
-                pass
             
             for event in pygame.event.get():
                 # Send information about event to pymunk thread
@@ -420,7 +402,7 @@ class Game:
         quit()
 
 if __name__ == "__main__":
-    gameConn, clientConn = Pipe()
+    gameConn, clientConn = Pipe(duplex=True)
     
     game = Game(gameConn)
     client = ClientProcess(clientConn)
