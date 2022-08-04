@@ -5,8 +5,8 @@ from multiprocessing import Process
 from sys import stdout
 import threading
 
-#HOST = "146.59.93.188"
-HOST = "127.0.0.1"
+HOST = "146.59.93.188"
+#HOST = "127.0.0.1"
 PORT = 1838
 
 class PySoccerClient(LineReceiver):
@@ -37,21 +37,21 @@ class PySoccerClientFactory(ClientFactory):
         self.lock = threading.Lock()
     
     def startedConnecting(self, connector):
-        print('Connecting to game server...')
+        print('Connecting to game server...', flush=True)
         self.conn.send("CONNECTING")
 
     def buildProtocol(self, addr):
-        print('Successfuly connected to game server')
+        print('Successfuly connected to game server', flush=True)
         self.conn.send("CONNECTED")
         return PySoccerClient(self.conn)
 
     def clientConnectionLost(self, connector, reason):
-        print('Lost connection to game server. Reason:', reason)
+        print('Lost connection to game server. Reason:', reason, flush=True)
         self.conn.send("RECONNECTING")
         connector.connect()
 
     def clientConnectionFailed(self, connector, reason):
-        print('Connection to game server failed. Reason:', reason)
+        print('Connection to game server failed. Reason:', reason, flush=True)
         self.conn.send("DISCONNECTED")
 
 class ClientProcess(Process):
